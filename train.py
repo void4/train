@@ -24,7 +24,9 @@ def img_path(path):
 
 @app.route('/ground')
 def img_ground():
-    return send_from_directory("static", choice(imagesWith("ground_")))
+    path = choice(imagesWith("ground_"))
+    print(path)
+    return send_from_directory(*os.path.split(path))
 
 @app.route('/air')
 def img_air():

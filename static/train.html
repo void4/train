@@ -83,52 +83,20 @@ canvas {
   z-index: -13;
 }
 </style>
-<!--
-<script type="text/javascript" src="js/socket.io.js"></script>
-<script>
-var socket = 1 ? io() : io(":5000");
 
-socket.on('connect', function(){
-
-});
-
-socket.on('event', function(data){
-  console.log(data)
-});
-
-socket.on('json', function(message){
-  //console.log(message)
-  var type = message["type"]
-  var data = message["data"]
-  if (type == "problems") {
-  }
-});
-
-socket.on('message', function(data){
-  console.log(data)
-});
-
-socket.on('disconnect', function(){
-
-});
-
-window.addEventListener("beforeunload", function() {
-  console.log("Disconnecting...")
-  socket.disconnect();
-});
-
-</script>-->
 </head>
 <body>
 
-adjust speed with bpm
+
 
 <canvas id="canvas" width="640" height="480"></canvas>
 
 <div id="app">
 
 </div>
+<!--
 <iframe width="200" height="100" src="https://www.youtube.com/embed/GOyGWMYqL1I" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+-->
 <script>
 
 var actives = []
@@ -136,7 +104,8 @@ var groups = {"/air":[], "/ground":[]}
 
 var ctx = document.getElementById("canvas").getContext("2d")
 
-var speed = 20
+//TODO: adjust speed with bpm
+var speed = 100
 var acceleration = 0.001
 
 var distance = 0
@@ -158,18 +127,25 @@ function draw() {
   ctx.fillStyle = "green"
   ctx.fill()
 
-  ctx.drawImage(resize(window["background"], w, h), 0, 0)
+  ctx.drawImage(window["background"], 0, 0)
 
   var g1 = distance%(2*w) == distance%(2*w)%w ? distance%(2*w) : distance%(2*w)-2*w
   var g2 = (distance-w)%(2*w) == (distance-w)%(2*w)%w ? (distance-w)%(2*w) : (distance-w)%(2*w)-2*w
 
-  ctx.drawImage(resize(window["grass"], w, h), g1, 0)
-  ctx.drawImage(resize(window["grass"], w, h), g2, 0)
+  ctx.drawImage(window["grass"], g1, 0)
+  ctx.drawImage(window["grass"], g2, 0)
+
+  // sort to draw fastest last (on top)
+  actives.sort((a,b) => a[3] > b[3] ? 1 : -1)
 
   for (var active of actives) {
     if (active.length > 1) {
-      active[0] += speed*active[3]//make faster as it nears horizontal visual center?
-      ctx.drawImage(active[2], active[0], active[1])
+      active[0] += speed*active[3]//make faster as it nears horizontal visual center
+      try {
+        ctx.drawImage(active[2], active[0], active[1])
+      } catch (error) {
+        console.log(error)
+      }
     }
   }
 
@@ -177,16 +153,17 @@ function draw() {
     return active[0] < w*1.5
   })
 
-  ctx.drawImage(resize(window["glass"], w, h), 0, 0)
+  ctx.drawImage(window["glass"], 0, 0)
 
   speed += acceleration
 
-  distance += speed
+  distance += speed * 0.1
 }
 
 function resizeFactor(img, factor) {
-  var oc = document.createElement('canvas'),
-    octx = oc.getContext('2d');
+  //these seem to have been global to not be deallocated before drawing
+  oc = document.createElement('canvas')
+  octx = oc.getContext('2d');
 
   oc.width = img.width * factor;
   oc.height = img.height * factor;
@@ -196,8 +173,8 @@ function resizeFactor(img, factor) {
 }
 
 function resize(img, w, h) {
-  var oc = document.createElement('canvas'),
-    octx = oc.getContext('2d');
+  oc = document.createElement('canvas')
+  octx = oc.getContext('2d');
 
   oc.width = w
   oc.height = h
@@ -205,7 +182,6 @@ function resize(img, w, h) {
 
   return oc
 }
-
 
 function randint(min, max) {
     min = Math.ceil(min);
@@ -220,12 +196,18 @@ function loadNewImage(path, name) {
   img.onload = function() {
     if (name == undefined) {
       groups[path].push(img)
+    } else {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      console.log(w,h)
+      window[name] = resize(img, w, h)
     }
     console.log("Loaded", img.src)
   }
-  img.src = path
+  img.src = path + "?time=" + new Date().getTime() // cachebreaker
 
   if (name != undefined) {
+
     window[name] = img
   }
 }
@@ -238,10 +220,12 @@ function loadWrapper(path) {
   }
 }
 
+//TODO add age to group list elements, remove them after some time
+
 function makeOneActive(path) {
 
-  var r = randint(0, groups[path].length+1)
-  if (r == groups[path].length) {
+  var r = randint(0, (groups[path].length+1)*1.1)
+  if (r >= groups[path].length) {
     loadWrapper(path)()
   } else {
 
@@ -249,19 +233,23 @@ function makeOneActive(path) {
     var w = window.innerWidth;
     var h = window.innerHeight;
 
+    var img = groups[path][r]
+
     var x = -Math.random()*w
     if (path == "/ground") {
-      var y = Math.random()*h/2*1.2+h/2*0.95
-      var factor = y/(h/2*0.95)
+      var factor = Math.random()
+      var y = factor*h/5+4*h/5 - img.height*4/5*factor
     } else {
-      var y = Math.random()*h/2
-      var factor = 1-y/(h/2)
+      var factor = 1-Math.random()
+      var y = (1-factor)*h*(4/5)
     }
 
-    var img = groups[path][r]
 
     img = resizeFactor(img, factor)
 
+    if (path == "/air") {
+      factor /= 2
+    }
     console.log(factor)
     actives.push([x,y,img,Math.pow(factor, 2)])
   }
@@ -277,10 +265,10 @@ loadNewImage("/img/glass.png", "glass")
 loadNewImage("/img/background.png", "background")
 loadNewImage("/img/grass.png", "grass")
 
-setInterval(makeOneActiveWrapper("/air"), 1000)
-setInterval(makeOneActiveWrapper("/ground"), 1000)
+setInterval(makeOneActiveWrapper("/air"), 500)
+setInterval(makeOneActiveWrapper("/ground"), 500)
 
-setInterval(draw, 20)
+setInterval(draw, 25)
 
 </script>
 </body>
