@@ -36,4 +36,4 @@ def img_air():
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(port=5555)
